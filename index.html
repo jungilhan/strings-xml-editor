@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>Strings XML Editor for Non-Programmer</title>
+    <link href='css/bootstrap.css' rel='stylesheet'>
+    <link href="css/style.css" rel="stylesheet" type="text/css" media="screen" />
+  </head>
+
+  <body>
+    <div id="drop-layer">
+      <div class="navbar navbar-fixed-top">
+        <div class="navbar-inner">
+          <div class="container">
+            <a class="brand" href="#">비-개발자를 위한 strings.xml 편집기</a>
+            <!--<button id='export-xml' type="button" class="btn btn-success pull-right">Export to strings.xml</button>-->
+          </div> <!-- container -->
+        </div> <!-- navbar-inner -->    
+        </div> <!-- navbar -->      
+
+      <div class="container content-wrapper">                            
+        <div id='option' class="btn-group pull-right hide">
+          <button id='add-value-column' class="btn">Add value column</button>
+        </div>
+
+        <ul id='tab' class="nav nav-tabs hide">
+          <li class="active">
+            <a class='name' href="#"></a>
+          </li>
+        </ul>                
+
+        <div class='drag-guide'>
+          <h3>여기로 strings.xml 파일을 드래그 & 드롭하세요.</h3>
+        </div>        
+      </div> <!-- container -->
+    </div> <!-- drop-layer -->
+  
+    <script type="text/javascript" src="js/jquery-1.9.1.js"></script>
+    <script type="text/javascript" src="js/bootstrap.js"></script>
+    <script type="text/javascript" src="js/xml2json.js"></script>
+    <script type="text/javascript">
+      $(document).ready(function() {
+        jQuery.event.props.push("dataTransfer");
+
+        $("#drop-layer").bind('dragenter dragover', function() {
+          $('.drag-guide').css('border', 'dashed 3px #5bb75b');
+          return false;
+        });
+
+        $("#drop-layer").bind('dragleave', function() {
+          $('.drag-guide').css('border', 'dashed 3px lightgray');
+          return false;
+        });
+
+        $("#drop-layer").bind("drop", function(e) {
+          e.stopPropagation();
+          e.preventDefault();
+
+          $('.drag-guide').hide();
+          $('#tab').show();
+
+          $('table').each(function() {
+            $(this).remove();
+          });
+
+          $('br').each(function() {
+            $(this).remove();
+          });
+
+          var files = e.dataTransfer.files;
+          $.each(files, function(index, file) {
+            var reader = new FileReader();
+
+            reader.onload = (function(file) {
+              return function(e) {                
+                $('#tab .name').text(file.name);
+
+                var xml2js = new X2JS();
+                var jsonObj = xml2js.xml_str2json(uncomment(this.result));
+
+                // TAG string
+                var string = { names: [], values: [] };
+                var length = jsonObj.resources.string.length;
+                for (var i = 0; i < length; i++) {
+                  var name = jsonObj.resources.string[i]._name;
+                  var value = jsonObj.resources.string[i].toString();
+
+                  if (jsonObj.resources.string[i].hasOwnProperty('g')) {
+                    var $xmlDoc = $(this.result);
+                    value = $xmlDoc.find('string').get(i).innerHTML;
+
+                  } else if (jsonObj.resources.string[i].hasOwnProperty('__cdata')) {
+                    value = '\<\!\[CDATA[' + value + ']]';
+                  }
+
+                  string.names.push(name);
+                  string.values.push(value);
+                }
+
+                // TAG string-array 
+                var stringArrays = [];                
+                if (jsonObj.resources['string-array'].hasOwnProperty('length')) {
+                  length = jsonObj.resources['string-array'].length;
+                  for (var i = 0; i < length; i++) {
+                    var stringArray = { name: '', items: [] };
+
+                    stringArray.name = jsonObj.resources['string-array'][i]._name;
+                    stringArray.items = jsonObj.resources['string-array'][i].item_asArray;
+                    stringArrays.push(stringArray);
+                  }
+                } else {
+                  var stringArray = { name: '', items: [] };
+
+                  stringArray.name = jsonObj.resources['string-array']._name;
+                  stringArray.items = jsonObj.resources['string-array'].item_asArray;
+                  stringArrays.push(stringArray);
+                }
+                
+                // 화면 출력
+                var $table = $("<table class='table table-striped table-hover'></table>");
+                var $thread = $('<thead><tr><th>#</th><th>Type</th><th>Key</th><th>Value</th></tr></thead>');
+                $table.append($thread);
+
+                var count = 0;
+                for (var i = 0; i < string.names.length; i++) {
+                  var $tr = $("<tr></tr>");
+                  var $index = $("<td></td>").text(++count);
+                  var $type = $("<td><span class='label label-success'>string</span></td>");
+                  var $key = $("<td></td>").text(string.names[i]);
+                  var $value = $("<td contentEditable='true'></td>").text(string.values[i]);
+                  $tr.append($index).append($type).append($key).append($value);
+                  $table.append($tr);
+                }
+
+                for (var i = 0; i < stringArrays.length; i++) {
+                  for (var j = 0; j < stringArrays[i].items.length; j++) {
+                    var $tr = $("<tr></tr>");
+                    var $index = $("<td></td>").text(++count);
+                    var $type = $("<td><span class='label label-info'>array</span></td>");
+                    var $key = $("<td></td>").text(stringArrays[i].name);
+                    var $value = $("<td contentEditable='true'></td>").text(stringArrays[i].items[j]);
+                    $tr.append($index).append($type).append($key).append($value);
+                    $table.append($tr);
+                  }
+                }
+
+                $('.content-wrapper').append($table)
+                .append('<br><br><br><br><br><br><br><br><br><br><br><br><br><br>');
+              };
+            })(files[index]);
+
+            reader.readAsText(file);
+          }); // each()
+
+          return false;
+        }); // bind("drop")
+        
+
+        $('#export-xml').bind('click', function() {                
+          var $table = $('table');
+          if ($table.length == 0) {
+            return;
+          }
+
+          var keys = [];
+          var values = [];
+
+          $table.find('tbody > tr').each(function() {
+            $(this).find('td').each(function(index) {
+              if (index == 1) {
+                keys.push($(this).text());
+              } else if (index == 2) {
+                values.push($(this).text());
+              }
+            });
+          });
+
+          var length = keys.length;
+          var string = '';
+          for (var i = 0; i < length; i++) {
+            string += '\t<string name="' + keys[i] + '">' + values[i] + '</string>\n';
+          }
+
+          exportToXML(string);
+        });
+
+        $('#add-value-column').bind('click', function() {
+          var $table = $('table');
+          if ($table.length == 0) {
+            return;
+          }
+
+          $table.find('thead > tr').append($('<th>Value</th>'));
+          $table.find('tbody > tr').each(function(index) {
+            if (index == 0) {
+              $(this).append($('<td contentEditable="true">이곳에 새로운 번역 메시지를 작성하세요.</td>'));  
+            } else {
+              $(this).append($('<td contentEditable="true"></td>'));  
+            }
+          });
+        });
+
+        var uncomment = function(string) {
+          return string.replace(/<!--([\s\S]*?)-->/mig, '');
+        }
+
+        var exportToXML = function(strings) {
+          var prolog = "<?xml version='1.0' encoding='UTF-8'?>\n";
+          var resources = '<resources>\n' + strings + '</resources>';
+          var xml = prolog + resources;
+          var textFileAsBlob = new Blob([xml], {type:'text/plain'});
+          var saveAs = 'strings.xml';
+
+          var downloadLink = document.createElement("a");
+          downloadLink.href = window.webkitURL.createObjectURL(textFileAsBlob);
+          downloadLink.download = saveAs;
+          downloadLink.click();
+        };
+      }); // $(document).ready()
+    </script>
+  </body>
+</html>

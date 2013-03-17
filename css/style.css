@@ -1,0 +1,30 @@
+@import url(http://fonts.googleapis.com/earlyaccess/nanumgothic.css);
+
+html, body {
+  height: 100%;
+  margin: 0;
+  font-family: 'Nanum Gothic', monospace; 
+}
+
+#drop-layer {
+  height: 100%;    
+}
+
+.content-wrapper {
+  height: 100%;
+  margin-top: 45px;
+  padding-top: 25px;
+}
+
+#tab {  
+  margin-bottom: 0px;
+}
+
+.drag-guide {
+  margin-top: 20px;
+  height: 86%;
+  border: dashed 3px lightgray;
+  padding-left: 16px;
+  color: #888888;
+  text-shadow: 0 1px 0 #ffffff;
+}
