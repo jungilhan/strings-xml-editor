@@ -20,6 +20,15 @@ html, body {
   margin-bottom: 0px;
 }
 
+#export-xml {
+  margin-right: 10px;
+}
+
+#beta-label {
+  vertical-align: top; 
+  font-size: 8px;
+}
+
 .drag-guide {
   margin-top: 20px;
   height: 86%;

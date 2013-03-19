@@ -12,13 +12,14 @@
       <div class="navbar navbar-fixed-top">
         <div class="navbar-inner">
           <div class="container">
-            <a class="brand" href="#">비-개발자를 위한 strings.xml 편집기</a>
-            <!--<button id='export-xml' type="button" class="btn btn-success pull-right">Export to strings.xml</button>-->
+            <a class="brand" href="#">비-개발자를 위한 strings.xml 편집기<span id='beta-label' class="label">Beta</span></a>
+            <button id='export-xlsx' type="button" class="btn btn-success pull-right">Export to strings.xlsx</button>
+            <button id='export-xml' type="button" class="btn btn-success pull-right">Export to strings.xml</button>
           </div> <!-- container -->
         </div> <!-- navbar-inner -->    
         </div> <!-- navbar -->      
 
-      <div class="container content-wrapper">                            
+      <div class="container content-wrapper">
         <div id='option' class="btn-group pull-right hide">
           <button id='add-value-column' class="btn">Add value column</button>
         </div>
@@ -38,6 +39,12 @@
     <script type="text/javascript" src="js/jquery-1.9.1.js"></script>
     <script type="text/javascript" src="js/bootstrap.js"></script>
     <script type="text/javascript" src="js/xml2json.js"></script>
+    <script type="text/javascript" src="js/xlsx.js"></script>
+    <script type="text/javascript" src="js/jszip.js"></script>
+    <script type="text/javascript" src="js/jszip-load.js"></script>
+    <script type="text/javascript" src="js/jszip-inflate.js"></script>
+    <script type="text/javascript" src="js/jszip-deflate.js"></script>
+
     <script type="text/javascript">
       $(document).ready(function() {
         jQuery.event.props.push("dataTransfer");
@@ -78,7 +85,7 @@
                 var xml2js = new X2JS();
                 var jsonObj = xml2js.xml_str2json(uncomment(this.result));
 
-                // TAG string
+                // string 태그 파싱
                 var string = { names: [], values: [] };
                 var length = jsonObj.resources.string.length;
                 for (var i = 0; i < length; i++) {
@@ -90,14 +97,14 @@
                     value = $xmlDoc.find('string').get(i).innerHTML;
 
                   } else if (jsonObj.resources.string[i].hasOwnProperty('__cdata')) {
-                    value = '\<\!\[CDATA[' + value + ']]';
+                    value = '\<\!\[CDATA[' + value + ']]>';
                   }
 
                   string.names.push(name);
                   string.values.push(value);
                 }
 
-                // TAG string-array 
+                // string-array 태그 파싱
                 var stringArrays = [];                
                 if (jsonObj.resources['string-array'].hasOwnProperty('length')) {
                   length = jsonObj.resources['string-array'].length;
@@ -155,33 +162,132 @@
           return false;
         }); // bind("drop")
         
-
-        $('#export-xml').bind('click', function() {                
+        $('#export-xlsx').bind('click', function() {
           var $table = $('table');
           if ($table.length == 0) {
             return;
           }
 
-          var keys = [];
-          var values = [];
+          var file = {
+            worksheets: [
+              []
+            ], // worksheets has one empty worksheet (array)
+            creator: 'Lonnie',
+            created: new Date('3/16/2013'),
+            lastModifiedBy: 'Lonnie',
+            modified: new Date(),
+            activeWorksheet: 0
+          }, w = file.worksheets[0]; // cache current worksheet
+          w.name = 'strings.xml';
 
-          $table.find('tbody > tr').each(function() {
-            $(this).find('td').each(function(index) {
-              if (index == 1) {
-                keys.push($(this).text());
-              } else if (index == 2) {
-                values.push($(this).text());
+          $table.find('thead > tr').each(function() {
+            var r = w.push([]) - 1; // index of current row
+
+            $(this).find('th').each(function(index) {              
+              if (index > 0) {
+               w[r].push($(this).text());
               }
             });
           });
 
-          var length = keys.length;
+          $table.find('tbody > tr').each(function() {
+            var r = w.push([]) - 1; // index of current row
+
+            $(this).find('td').each(function(index) {
+              if (index > 0) {
+                var text = $(this).text().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#x27;');
+                w[r].push(text);
+              }
+            });
+          });
+
+          window.location = xlsx(file).href();
+        });
+
+        $('#export-xml').bind('click', function() {
+          var $table = $('table');
+          if ($table.length == 0) {
+            return;
+          }
+
+          var COLUMN_TYPE = 1;
+          var COLUMN_KEY = 2;
+          var COLUMN_VALUE = 3;
+
+          // string 타입 처리
+          var keys = [];
+          var values = [];
+
+          $table.find('tbody > tr').each(function() {
+            var isStringTag = false;
+
+            $(this).find('td').each(function(index) {
+              if (index == COLUMN_TYPE && $(this).text() == 'string') {
+                isStringTag = true;
+              }
+
+              if (isStringTag) {
+                if (index == COLUMN_KEY) {
+                  keys.push($(this).text());
+                } else if (index == COLUMN_VALUE) {
+                  values.push($(this).text());
+                }
+              }
+            });
+          });
+
           var string = '';
-          for (var i = 0; i < length; i++) {
+          for (var i = 0; i < keys.length; i++) {
             string += '\t<string name="' + keys[i] + '">' + values[i] + '</string>\n';
           }
 
-          exportToXML(string);
+          // string-array 타입 처리
+          var stringArrays = [];
+
+          $table.find('tbody > tr').each(function() {
+            var stringArray = { name: '', items: [] };
+            var isStringArrayTag = false;            
+
+            $(this).find('td').each(function(index) {
+              if (index == COLUMN_TYPE && $(this).text() == 'array') {
+                isStringArrayTag = true;
+              }
+
+              if (isStringArrayTag) {                
+                if (index == COLUMN_KEY) {
+                  stringArray.name = $(this).text();
+                  var length = stringArrays.length;
+                  if (length > 0 && stringArrays[length - 1].name == stringArray.name) {
+                    // Do nothing
+
+                  } else {
+                    stringArrays.push(stringArray);
+                  }
+
+                } else if (index == COLUMN_VALUE) {
+                  var length = stringArrays.length;
+                  for (var i = 0; i < length; i++) {
+                    if (stringArrays[i].name == stringArray.name) {
+                      stringArrays[i].items.push($(this).text());
+                      break;
+                    }
+                  }
+                }
+              }
+            });
+          });
+
+          var array = '';
+          for (var i = 0; i < stringArrays.length; i++) {
+            array += '\t<string-array name="' + stringArrays[i].name + '">\n';
+            for (var j = 0; j < stringArrays[i].items.length; j++) {
+              array += '\t\t<item>' + stringArrays[i].items[j] + '</item>\n'; 
+            }
+
+            array += '\t</string-array>\n';
+          }
+
+          exportToXML(string, array);
         });
 
         $('#add-value-column').bind('click', function() {
@@ -204,9 +310,9 @@
           return string.replace(/<!--([\s\S]*?)-->/mig, '');
         }
 
-        var exportToXML = function(strings) {
+        var exportToXML = function(string, array) {
           var prolog = "<?xml version='1.0' encoding='UTF-8'?>\n";
-          var resources = '<resources>\n' + strings + '</resources>';
+          var resources = '<resources>\n' + string + array + '</resources>';
           var xml = prolog + resources;
           var textFileAsBlob = new Blob([xml], {type:'text/plain'});
           var saveAs = 'strings.xml';
