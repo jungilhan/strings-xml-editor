@@ -208,33 +208,38 @@
 
           var file = {
             worksheets: [
-              []
-            ], // worksheets has one empty worksheet (array)
-            creator: 'Lonnie',
-            created: new Date('3/16/2013'),
-            lastModifiedBy: 'Lonnie',
-            modified: new Date(),
-            activeWorksheet: 0
-          }, w = file.worksheets[0]; // cache current worksheet
+              {data: [[]]}
+            ]              
+          };
+
+          var w = file.worksheets[0]; // cache current worksheet
           w.name = 'strings.xml';
+          w.data[0][0] = '1';
+          w.data[0][1] = {value: '2G'};
+          w.data[0][1] = {value: '3G'};
+          // file.worksheets.push([]);
+          // file.worksheets[1].data.push([]);
+          // file.worksheets[1].data.push('2');
+
+          // var w = file.worksheets[0]; // cache current worksheet
+          // w.name = 'strings.xml';
 
           $table.find('thead > tr').each(function() {
-            var r = w.push([]) - 1; // index of current row
+            var row = w.data.push([]) - 1; // index of current row            
 
-            $(this).find('th').each(function(index) {              
-              if (index > 0) {
-               w[r].push($(this).text());
+            $(this).find('th').each(function(column) {
+              if (column > 0) {
+                w.data[row][column - 1] = {value: $(this).text()};
               }
             });
           });
 
           $table.find('tbody > tr').each(function() {
-            var r = w.push([]) - 1; // index of current row
+            var row = w.data.push([]) - 1; // index of current row
 
-            $(this).find('td').each(function(index) {
-              if (index > 0) {
-                var text = $(this).text().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#x27;');
-                w[r].push(text);
+            $(this).find('td').each(function(column) {
+              if (column > 0) {
+                w.data[row][column - 1] = {value: $(this).text()};
               }
             });
           });
