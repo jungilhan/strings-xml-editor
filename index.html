@@ -14,8 +14,8 @@
           <div class="container">
             <a href="https://github.com/jungilhan/strings-xml-editor"><img style="position: absolute; top: 0; left: 0; border: 0;" src="https://s3.amazonaws.com/github/ribbons/forkme_left_gray_6d6d6d.png" alt="Fork me on GitHub"></a>
             <a class="brand" href="#">비-개발자를 위한 strings.xml 편집기<span id='beta-label' class="label">Beta</span></a>
-            <button id='export-xlsx' type="button" class="btn btn-success pull-right">Export to strings.xlsx</button>
-            <button id='export-xml' type="button" class="btn btn-success pull-right">Export to strings.xml</button>
+            <button id='export-xlsx' type="button" class="btn btn-success pull-right">Export to XLSX</button>
+            <button id='export-xml' type="button" class="btn btn-success pull-right">Export to XML</button>
           </div> <!-- container -->
         </div> <!-- navbar-inner -->    
         </div> <!-- navbar -->      
@@ -33,7 +33,8 @@
 
         <div class='drag-guide'>
           <h3>여기로 strings.xml 파일을 드래그 & 드롭하세요.</h3>
-        </div>        
+          <p>샘플 파일 실행해보기 <a id='sample'>sample-strings.xml</a></p>
+        </div>
       </div> <!-- container -->
     </div> <!-- drop-layer -->
   
@@ -76,92 +77,128 @@
           });
 
           var files = e.dataTransfer.files;
-          $.each(files, function(index, file) {
-            var reader = new FileReader();
+          var reader = new FileReader();
 
-            reader.onload = (function(file) {
-              return function(e) {                
-                $('#tab .name').text(file.name);
-
-                var xml2js = new X2JS();
-                var jsonObj = xml2js.xml_str2json(uncomment(this.result));
-
-                // string 태그 파싱
-                var string = { names: [], values: [] };
-                var length = jsonObj.resources.string.length;
-                for (var i = 0; i < length; i++) {
-                  var name = jsonObj.resources.string[i]._name;
-                  var value = jsonObj.resources.string[i].toString();
-
-                  if (jsonObj.resources.string[i].hasOwnProperty('g')) {
-                    var $xmlDoc = $(this.result);
-                    value = $xmlDoc.find('string').get(i).innerHTML;
-
-                  } else if (jsonObj.resources.string[i].hasOwnProperty('__cdata')) {
-                    value = '\<\!\[CDATA[' + value + ']]>';
-                  }
-
-                  string.names.push(name);
-                  string.values.push(value);
-                }
-
-                // string-array 태그 파싱
-                var stringArrays = [];                
-                if (jsonObj.resources['string-array'].hasOwnProperty('length')) {
-                  length = jsonObj.resources['string-array'].length;
-                  for (var i = 0; i < length; i++) {
-                    var stringArray = { name: '', items: [] };
-
-                    stringArray.name = jsonObj.resources['string-array'][i]._name;
-                    stringArray.items = jsonObj.resources['string-array'][i].item_asArray;
-                    stringArrays.push(stringArray);
-                  }
-                } else {
-                  var stringArray = { name: '', items: [] };
-
-                  stringArray.name = jsonObj.resources['string-array']._name;
-                  stringArray.items = jsonObj.resources['string-array'].item_asArray;
-                  stringArrays.push(stringArray);
-                }
-                
-                // 화면 출력
-                var $table = $("<table class='table table-striped table-hover'></table>");
-                var $thread = $('<thead><tr><th>#</th><th>Type</th><th>Key</th><th>Value</th></tr></thead>');
-                $table.append($thread);
-
-                var count = 0;
-                for (var i = 0; i < string.names.length; i++) {
-                  var $tr = $("<tr></tr>");
-                  var $index = $("<td></td>").text(++count);
-                  var $type = $("<td><span class='label label-success'>string</span></td>");
-                  var $key = $("<td></td>").text(string.names[i]);
-                  var $value = $("<td contentEditable='true'></td>").text(string.values[i]);
-                  $tr.append($index).append($type).append($key).append($value);
-                  $table.append($tr);
-                }
-
-                for (var i = 0; i < stringArrays.length; i++) {
-                  for (var j = 0; j < stringArrays[i].items.length; j++) {
-                    var $tr = $("<tr></tr>");
-                    var $index = $("<td></td>").text(++count);
-                    var $type = $("<td><span class='label label-info'>array</span></td>");
-                    var $key = $("<td></td>").text(stringArrays[i].name);
-                    var $value = $("<td contentEditable='true'></td>").text(stringArrays[i].items[j]);
-                    $tr.append($index).append($type).append($key).append($value);
-                    $table.append($tr);
-                  }
-                }
-
-                $('.content-wrapper').append($table)
-                .append('<br><br><br><br><br><br><br><br><br><br><br><br><br><br>');
-              };
-            })(files[index]);
-
-            reader.readAsText(file);
-          }); // each()
-
+          reader.onload = (function(file) {
+            return function(e) {
+              parseXmlAndRender(file.name, this.result);
+            };
+          })(files[0]);
+          reader.readAsText(files[0]);
+          
           return false;
         }); // bind("drop")
+
+        $('#sample').bind('click', function() {
+          $.ajax({
+            url: 'http://jungilhan.github.com/strings-xml-editor/sample-strings.xml',
+            dataType: 'xml',
+            encoding: 'UTF-8',
+            success: function(xml) {
+              parseXmlAndRender('sample-strings.xml', xml);
+            }
+          });
+        });
+
+        var parseXmlAndRender = function(name, xml) {
+          $('#tab .name').text(name);
+
+          var xml2js = new X2JS();
+          var jsonObj = xml2js.xml_str2json(uncomment(xml));
+
+          // string 태그 파싱
+          var string = { names: [], values: [] };
+
+          if (jsonObj.resources.string.hasOwnProperty('length')) {
+            var length = jsonObj.resources.string.length;
+            for (var i = 0; i < length; i++) {
+              var name = jsonObj.resources.string[i]._name;
+              var value = jsonObj.resources.string[i].toString();
+
+              if (jsonObj.resources.string[i].hasOwnProperty('g')) {
+                var $xmlDoc = $(xml);
+                value = $xmlDoc.find('string').get(i).innerHTML;
+
+              } else if (jsonObj.resources.string[i].hasOwnProperty('__cdata')) {
+                value = '\<\!\[CDATA[' + value + ']]>';
+              }
+
+              // Value가 비어있을 때를 의미
+              if (value == '[object Object]') {
+               value = '';
+              }
+
+              string.names.push(name);
+              string.values.push(value);
+            }
+
+          } else {
+            var name = jsonObj.resources.string._name;
+            var value = jsonObj.resources.string.toString();
+            if (value == '[object Object]') {
+              value = '';
+            }
+          
+            string.names.push(name);
+            string.values.push(value);
+          }
+
+          // string-array 태그 파싱
+          var stringArrays = [];                
+          if (jsonObj.resources['string-array'] !== undefined) {
+              if (jsonObj.resources['string-array'].hasOwnProperty('length')) {
+              length = jsonObj.resources['string-array'].length;
+              for (var i = 0; i < length; i++) {
+                var stringArray = { name: '', items: [] };
+
+                stringArray.name = jsonObj.resources['string-array'][i]._name;
+                stringArray.items = jsonObj.resources['string-array'][i].item_asArray;
+                stringArrays.push(stringArray);
+              }
+            } else {
+              var stringArray = { name: '', items: [] };
+
+              stringArray.name = jsonObj.resources['string-array']._name;
+              stringArray.items = jsonObj.resources['string-array'].item_asArray;
+              stringArrays.push(stringArray);
+            }
+          }
+          
+          // 화면 출력
+          var $table = $("<table class='table table-striped table-hover'></table>");
+          var $thread = $('<thead><tr><th>#</th><th>Type</th><th>Key</th><th>Value</th></tr></thead>');
+          $table.append($thread);
+
+          var count = 0;
+          for (var i = 0; i < string.names.length; i++) {
+            var $tr = $("<tr></tr>");
+            var $index = $("<td></td>").text(++count);
+            var $type = $("<td><span class='label label-success'>string</span></td>");
+            var $key = $("<td></td>").text(string.names[i]);
+            var $value = $("<td contentEditable='true'></td>").text(string.values[i]);
+            $tr.append($index).append($type).append($key).append($value);
+            $table.append($tr);
+          }
+
+          for (var i = 0; i < stringArrays.length; i++) {
+            if (stringArrays[i].items === undefined) {
+              break;
+            }
+
+            for (var j = 0; j < stringArrays[i].items.length; j++) {
+              var $tr = $("<tr></tr>");
+              var $index = $("<td></td>").text(++count);
+              var $type = $("<td><span class='label label-info'>array</span></td>");
+              var $key = $("<td></td>").text(stringArrays[i].name);
+              var $value = $("<td contentEditable='true'></td>").text(stringArrays[i].items[j]);
+              $tr.append($index).append($type).append($key).append($value);
+              $table.append($tr);
+            }
+          }
+
+          $('.content-wrapper').append($table)
+          .append('<br><br><br><br><br><br><br><br><br><br><br><br><br><br>');
+        }
         
         $('#export-xlsx').bind('click', function() {
           var $table = $('table');
