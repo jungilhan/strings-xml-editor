@@ -64,18 +64,7 @@
         $("#drop-layer").bind("drop", function(e) {
           e.stopPropagation();
           e.preventDefault();
-
-          $('.drag-guide').hide();
-          $('#tab').show();
-
-          $('table').each(function() {
-            $(this).remove();
-          });
-
-          $('br').each(function() {
-            $(this).remove();
-          });
-
+          
           var files = e.dataTransfer.files;
           var reader = new FileReader();
 
@@ -92,16 +81,26 @@
         $('#sample').bind('click', function() {
           $.ajax({
             url: 'http://jungilhan.github.com/strings-xml-editor/sample-strings.xml',
-            dataType: 'xml',
+            dataType: 'text',
             encoding: 'UTF-8',
             success: function(xml) {
-              console.log(xml);
-              parseXmlAndRender('sample-strings.xml', xml.toString());
+              parseXmlAndRender('sample-strings.xml', xml);
             }
           });
         });
 
         var parseXmlAndRender = function(name, xml) {
+          $('.drag-guide').hide();
+          $('#tab').show();
+
+          $('table').each(function() {
+            $(this).remove();
+          });
+
+          $('br').each(function() {
+            $(this).remove();
+          });
+
           $('#tab .name').text(name);
 
           var xml2js = new X2JS();
