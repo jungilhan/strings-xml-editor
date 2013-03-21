@@ -85,7 +85,7 @@
             };
           })(files[0]);
           reader.readAsText(files[0]);
-          
+
           return false;
         }); // bind("drop")
 
@@ -95,7 +95,8 @@
             dataType: 'xml',
             encoding: 'UTF-8',
             success: function(xml) {
-              parseXmlAndRender('sample-strings.xml', xml);
+              console.log(xml);
+              parseXmlAndRender('sample-strings.xml', xml.toString());
             }
           });
         });
